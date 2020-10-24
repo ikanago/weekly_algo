@@ -51,7 +51,23 @@ impl<T: Ord> Node<T> {
         *new_rotation_root.lhs.borrow_mut() = Some(node);
         new_rotation_root
     }
+
+    fn rotate_right(node: Rc<Node<T>>) -> Rc<Node<T>> {
+        if node.lhs.borrow().is_none() {
+            return node;
+        }
+
+        let new_rotation_root = Rc::clone(node.lhs.borrow().as_ref().unwrap());
+        *node.lhs.borrow_mut() = new_rotation_root
+            .rhs
+            .borrow()
+            .as_ref()
+            .and_then(|node| Some(Rc::clone(node)));
+        *new_rotation_root.rhs.borrow_mut() = Some(node);
+        new_rotation_root
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -101,6 +117,36 @@ mod tests {
                         Some(Node::new(14, None, None)),
                     )),
                     Some(Node::new(19, None, None)),
+                ))),
+            },
+            tree
+        )
+    }
+
+    #[test]
+    fn right_rotation() {
+        let mut tree = RedBlackTree {
+            root: Some(Rc::new(Node::new(
+                18,
+                Some(Node::new(
+                    11,
+                    Some(Node::new(9, None, None)),
+                    Some(Node::new(14, None, None)),
+                )),
+                Some(Node::new(19, None, None)),
+            ))),
+        };
+        tree.root = Some(Node::rotate_right(tree.root.unwrap()));
+        assert_eq!(
+            RedBlackTree {
+                root: Some(Rc::new(Node::new(
+                    11,
+                    Some(Node::new(9, None, None)),
+                    Some(Node::new(
+                        18,
+                        Some(Node::new(14, None, None)),
+                        Some(Node::new(19, None, None)),
+                    )),
                 ))),
             },
             tree
