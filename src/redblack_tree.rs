@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 #[derive(Debug, PartialEq)]
 pub struct RedBlackTree<T: Ord> {
@@ -21,11 +21,12 @@ impl<T: Ord> RedBlackTree<T> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 struct Node<T: Ord> {
     key: T,
     lhs: RefCell<Option<Rc<Node<T>>>>,
     rhs: RefCell<Option<Rc<Node<T>>>>,
+    parent: RefCell<Option<Weak<Node<T>>>>,
 }
 
 impl<T: Ord> Node<T> {
@@ -34,6 +35,7 @@ impl<T: Ord> Node<T> {
             key,
             lhs: RefCell::new(lhs.map(|node| Rc::new(node))),
             rhs: RefCell::new(rhs.map(|node| Rc::new(node))),
+            parent: RefCell::new(None),
         }
     }
 
@@ -68,14 +70,15 @@ impl<T: Ord> Node<T> {
     }
 }
 
+impl<T: Ord> PartialEq for Node<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.key.eq(&other.key) && self.lhs.eq(&other.lhs) && self.rhs.eq(&other.rhs)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn initilization() {
-        assert_eq!(RedBlackTree { root: None }, RedBlackTree::<u64>::new());
-    }
 
     #[test]
     fn insert_root() {
@@ -86,7 +89,8 @@ mod tests {
                 root: Some(Rc::new(Node {
                     key: 42,
                     lhs: RefCell::new(None),
-                    rhs: RefCell::new(None)
+                    rhs: RefCell::new(None),
+                    parent: RefCell::new(None),
                 }))
             },
             tree
