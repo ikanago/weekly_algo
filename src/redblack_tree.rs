@@ -54,11 +54,17 @@ impl<T: Ord> Node<T> {
         }
 
         let new_rotation_root = Rc::clone(node.rhs.borrow().as_ref().unwrap());
+        new_rotation_root.parent.swap(&node.parent);
+        node.parent.replace(Rc::downgrade(&new_rotation_root));
+
         *node.rhs.borrow_mut() = new_rotation_root
             .lhs
             .borrow()
             .as_ref()
             .and_then(|node| Some(Rc::clone(node)));
+        if let Some(lhs) = new_rotation_root.lhs.borrow().as_ref() {
+            lhs.parent.replace(Rc::downgrade(&node));
+        }
         *new_rotation_root.lhs.borrow_mut() = Some(node);
         new_rotation_root
     }
@@ -69,11 +75,17 @@ impl<T: Ord> Node<T> {
         }
 
         let new_rotation_root = Rc::clone(node.lhs.borrow().as_ref().unwrap());
+        new_rotation_root.parent.swap(&node.parent);
+        node.parent.replace(Rc::downgrade(&new_rotation_root));
+
         *node.lhs.borrow_mut() = new_rotation_root
             .rhs
             .borrow()
             .as_ref()
             .and_then(|node| Some(Rc::clone(node)));
+        if let Some(rhs) = new_rotation_root.rhs.borrow().as_ref() {
+            rhs.parent.replace(Rc::downgrade(&node));
+        }
         *new_rotation_root.rhs.borrow_mut() = Some(node);
         new_rotation_root
     }
@@ -140,7 +152,6 @@ mod tests {
                 Some(Node::new(19, None, None)),
             )),
         );
-        let right_left = Node::new(14, None, None);
         node = Node::rotate_left(node);
         assert!(is_valid(&node));
         assert_eq!(
