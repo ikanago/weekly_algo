@@ -15,7 +15,7 @@ impl<T: Ord> RedBlackTree<T> {
         match &self.root {
             Some(_) => unimplemented!(),
             None => {
-                self.root = Some(Rc::new(Node::new(key, None, None)));
+                self.root = Some(Node::new(key, None, None));
             }
         }
     }
@@ -26,17 +26,26 @@ struct Node<T: Ord> {
     key: T,
     lhs: RefCell<Option<Rc<Node<T>>>>,
     rhs: RefCell<Option<Rc<Node<T>>>>,
-    parent: RefCell<Option<Weak<Node<T>>>>,
+    parent: RefCell<Weak<Node<T>>>,
 }
 
 impl<T: Ord> Node<T> {
-    fn new(key: T, lhs: Option<Node<T>>, rhs: Option<Node<T>>) -> Self {
-        Self {
+    fn new(key: T, lhs: Option<Rc<Node<T>>>, rhs: Option<Rc<Node<T>>>) -> Rc<Self> {
+        let node = Rc::new(Self {
             key,
-            lhs: RefCell::new(lhs.map(|node| Rc::new(node))),
-            rhs: RefCell::new(rhs.map(|node| Rc::new(node))),
-            parent: RefCell::new(None),
+            lhs: RefCell::new(None),
+            rhs: RefCell::new(None),
+            parent: RefCell::new(Weak::new()),
+        });
+        if let Some(lhs) = lhs {
+            *lhs.parent.borrow_mut() = Rc::downgrade(&node);
+            *node.lhs.borrow_mut() = Some(lhs);
         }
+        if let Some(rhs) = rhs {
+            *rhs.parent.borrow_mut() = Rc::downgrade(&node);
+            *node.rhs.borrow_mut() = Some(rhs);
+        }
+        node
     }
 
     fn rotate_left(node: Rc<Node<T>>) -> Rc<Node<T>> {
@@ -80,17 +89,40 @@ impl<T: Ord> PartialEq for Node<T> {
 mod tests {
     use super::*;
 
+    fn is_valid<T: Ord>(node: &Rc<Node<T>>) -> bool {
+        let is_lhs_valid = if let Some(lhs) = node.lhs.borrow().as_ref() {
+            if node.key <= lhs.key || node.key != lhs.parent.borrow().upgrade().unwrap().key {
+                false
+            } else {
+                is_valid(lhs)
+            }
+        } else {
+            true
+        };
+        let is_rhs_valid = if let Some(rhs) = node.rhs.borrow().as_ref() {
+            if node.key >= rhs.key || node.key != rhs.parent.borrow().upgrade().unwrap().key {
+                false
+            } else {
+                is_valid(rhs)
+            }
+        } else {
+            true
+        };
+        is_lhs_valid && is_rhs_valid
+    }
+
     #[test]
     fn insert_root() {
         let mut tree = RedBlackTree::new();
         tree.insert(42);
+        assert!(is_valid(&tree.root.clone().unwrap()));
         assert_eq!(
             RedBlackTree {
                 root: Some(Rc::new(Node {
                     key: 42,
                     lhs: RefCell::new(None),
                     rhs: RefCell::new(None),
-                    parent: RefCell::new(None),
+                    parent: RefCell::new(Weak::new()),
                 }))
             },
             tree
@@ -99,38 +131,20 @@ mod tests {
 
     #[test]
     fn left_rotation() {
-        let mut tree = RedBlackTree {
-            root: Some(Rc::new(Node::new(
-                11,
-                Some(Node::new(9, None, None)),
-                Some(Node::new(
-                    18,
-                    Some(Node::new(14, None, None)),
-                    Some(Node::new(19, None, None)),
-                )),
-            ))),
-        };
-        tree.root = Some(Node::rotate_left(tree.root.unwrap()));
+        let mut node = Node::new(
+            11,
+            Some(Node::new(9, None, None)),
+            Some(Node::new(
+                18,
+                Some(Node::new(14, None, None)),
+                Some(Node::new(19, None, None)),
+            )),
+        );
+        let right_left = Node::new(14, None, None);
+        node = Node::rotate_left(node);
+        assert!(is_valid(&node));
         assert_eq!(
-            RedBlackTree {
-                root: Some(Rc::new(Node::new(
-                    18,
-                    Some(Node::new(
-                        11,
-                        Some(Node::new(9, None, None)),
-                        Some(Node::new(14, None, None)),
-                    )),
-                    Some(Node::new(19, None, None)),
-                ))),
-            },
-            tree
-        )
-    }
-
-    #[test]
-    fn right_rotation() {
-        let mut tree = RedBlackTree {
-            root: Some(Rc::new(Node::new(
+            Node::new(
                 18,
                 Some(Node::new(
                     11,
@@ -138,22 +152,35 @@ mod tests {
                     Some(Node::new(14, None, None)),
                 )),
                 Some(Node::new(19, None, None)),
-            ))),
-        };
-        tree.root = Some(Node::rotate_right(tree.root.unwrap()));
+            ),
+            node
+        )
+    }
+
+    #[test]
+    fn right_rotation() {
+        let mut node = Node::new(
+            18,
+            Some(Node::new(
+                11,
+                Some(Node::new(9, None, None)),
+                Some(Node::new(14, None, None)),
+            )),
+            Some(Node::new(19, None, None)),
+        );
+        node = Node::rotate_right(node);
+        assert!(is_valid(&node));
         assert_eq!(
-            RedBlackTree {
-                root: Some(Rc::new(Node::new(
-                    11,
-                    Some(Node::new(9, None, None)),
-                    Some(Node::new(
-                        18,
-                        Some(Node::new(14, None, None)),
-                        Some(Node::new(19, None, None)),
-                    )),
-                ))),
-            },
-            tree
+            Node::new(
+                11,
+                Some(Node::new(9, None, None)),
+                Some(Node::new(
+                    18,
+                    Some(Node::new(14, None, None)),
+                    Some(Node::new(19, None, None)),
+                )),
+            ),
+            node
         )
     }
 }
