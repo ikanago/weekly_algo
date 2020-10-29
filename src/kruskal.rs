@@ -52,7 +52,7 @@ impl UnionFind {
     }
 }
 
-#[derive(Clone, Debug, Ord, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Edge {
     from: usize,
     to: usize,
@@ -65,9 +65,23 @@ impl Edge {
     }
 }
 
+impl Ord for Edge {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.cost.cmp(&other.cost)
+    }
+}
+
+impl PartialOrd for Edge {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Find minimum spanning tree by kruskal method.
+/// Time complexity is `O(|E| log|E|)
 pub fn kruskal(edges: Vec<Edge>, num_vertex: usize) -> Vec<Edge> {
     let mut edges = edges;
-    edges.sort_by(|e1, e2| e1.cost.cmp(&e2.cost));
+    edges.sort();
     let mut spanning = Vec::new();
     let mut uf = UnionFind::new(num_vertex);
     for e in edges {
